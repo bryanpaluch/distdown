@@ -1,0 +1,5 @@
+#!/usr/bin/env node
+
+var distdown = require('../lib/distdown');
+
+distdown.start();

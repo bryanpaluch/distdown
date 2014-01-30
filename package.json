@@ -1,0 +1,15 @@
+{
+  "name": "distdown",
+  "version": "0.0.1",
+  "description": "Command line app for downloading applications from distdown sftp servers",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "~2.1.0",
+    "async": "~0.2.10"
+  }
+}
