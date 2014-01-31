@@ -1,18 +1,18 @@
+#!/usr/bin/env node
 var program = require('commander');
 var fs = require('fs');
 var async = require("async");
 
-exports.start = function(){
-  program
-    .command('download <org> <project_name> <shortsha>')
-    .description('download a version of your application that corresponds to the git shortsha') .option("-i, --install", "Will also run the special dist_install.js script after download")
-    .action(downloadShort);
+program
+  .command('download <org> <project_name> <shortsha>')
+  .description('download a version of your application that corresponds to the git shortsha') .option("-i, --install", "Will also run the special dist_install.js script after download")
+  .action(downloadShort);
 
-  program
-    .command('setup')
-    .description('Configures machine for use with a distdown sftp server')
-    .option("-o, --overwrite", "Over write ~/.distdownrc")
-    .action(setup);      
+program
+  .command('setup')
+  .description('Configures machine for use with a distdown sftp server')
+  .option("-o, --overwrite", "Over write ~/.distdownrc")
+  .action(setup);      
 
 
 
@@ -96,7 +96,6 @@ exports.start = function(){
      
   }
 
-};
 
 function ask(cb){
 
@@ -107,5 +106,4 @@ function ask(cb){
     cb(data);
   });
   process.stdin.resume(); 
-
 }

@@ -1,5 +1,14 @@
 #!/usr/bin/env node
+var program = require('commander');
+var fs = require('fs');
+var async = require("async");
 
-var distdown = require('../lib/distdown');
+program
+  .command('list <org> <project_name>', "List projects or releases under an project ")
+  .command('download <org> <project_name> <shortsha>', "download a version of your application that corresponds to the git shortsha")
+  .command('setup', "Configures machine for use with a distdown sftp server")
+  .parse(process.argv);
 
-distdown.start();
+if(!program.args.length) program.help();
+
+  

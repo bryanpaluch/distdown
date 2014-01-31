@@ -1,0 +1,105 @@
+#!/usr/bin/env node
+var program = require('commander');
+var fs = require('fs');
+var async = require("async");
+var Connection = require("ssh2");
+var Table = require('cli-table');
+
+program.parse(process.argv);
+
+try{
+  var configFile = fs.readFileSync(process.env.HOME + "/.distdownrc");
+  var config = JSON.parse(configFile);
+}catch(e){
+  console.log("problem parsing distdownrc");
+}
+
+console.log(program.args);
+
+//The default folder on the sftp server is projects
+//Org lookup
+var type = 'orgLookup';
+var col1Name = 'Organizations/Users';
+
+var path = 'projects';
+
+switch(program.args.length){
+  case 0:
+    break;
+  case 1:
+    path = 'projects/' + program.args[0];
+    type = 'projectLookup';
+    col1Name = 'Projects';
+    break;
+  case 2:
+    path = 'projects/' + program.args[0] + "/" +  program.args[1];
+    type = 'releaseLookup';
+    col1Name = 'Releases';
+    break;
+  default:
+    console.log("Too many arguments");
+    return;
+}
+
+var c = new Connection();
+c.on('ready', function(){
+  c.sftp(function(err, sftp){
+    if(err) throw err;
+    var projectList = [];
+    sftp.opendir(path, function  readdir (err, handle){
+      if(err){
+        console.log("Unknown org or project");
+        process.exit();
+        throw err;
+
+      }
+      sftp.readdir(handle,  function(err, list){
+        if(err) throw err;
+        if (list === false) {
+          sftp.close(handle, function(err){
+            if(err) throw err;
+            sftp.end();
+            display(projectList);
+          });
+          return;
+        }
+        list.forEach(function(item){
+          // ignore .files
+          if(item.filename.substring(0,1) === '.') return;
+          
+          projectList.push([item.filename, new Date(item.attrs.mtime*1000).toLocaleString()]);
+
+        });
+        readdir(undefined, handle);
+      });
+    });
+  });
+
+});
+
+var ipport = config.ipport.split(':');
+var host = ipport[0];
+var port = (ipport.length > 1) ? ipport[1] : 22;
+
+console.log("Connecting to " + host + " " + port);
+c.connect({
+  host: host,
+  port : port,
+  username: config.username,
+  privateKey: fs.readFileSync(config.keyPath)
+});
+
+
+function display(list){
+  var table = new Table({
+    head: [col1Name, 'Last Update'],
+    colWidth: [200, 100]
+  });
+
+  list.forEach(function(project){
+    table.push(project);
+  });
+  console.log(table.toString());
+  process.exit();
+
+}

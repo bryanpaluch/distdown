@@ -1,0 +1,89 @@
+#!/usr/bin/env node
+var program = require('commander');
+var fs = require('fs');
+var async = require("async");
+
+program
+  .option('-o, --overwrite', "Over write ~/.distdownrc")
+  .parse(process.argv);
+
+  var settings = !program.overwrite && fs.existsSync('./.distdownrc');
+
+  if(settings){
+    console.log("Using local distdown config already");
+    return;
+  }
+
+  settings = !program.overwrite && fs.existsSync(process.env.HOME + '/.distdownrc');
+ 
+  if(settings){
+    console.log("Using ~/.distdownrc config already");
+    return;
+  }
+
+  var config;
+
+  function getData (cb){
+    async.series({
+      ipport: function(cb){
+        ask("Enter distdown server ip (sftp ip:port): ", function(ipport){
+          cb(null, ipport);
+        });
+      },
+      username: function(cb){
+        ask("Enter distdown user: ", function(user){
+          cb(null, user);
+        });
+      },
+      keyPath: function(cb){
+        ask("Enter distdown key ['~/.ssh/id_rsa']: ", function(keyPath){
+          if(keyPath === '') keyPath = process.env.HOME + '/.ssh/id_rsa';
+          cb(null, keyPath);
+        });
+      }
+    },
+    function(err, results){
+      console.log("Using server: " + results.ipport + " key: " + results.keyPath);
+      cb(err, results);
+    });
+  }
+
+  function writeConfigFile(config, cb){
+    var path = process.env.HOME + '/.distdownrc'; 
+    console.log("creating config file ~/.distdownrc");
+    fs.writeFile(path,JSON.stringify(config, null, 4), function(err){
+      if(err){
+        console.log(err);
+        cb(err);
+      }else {
+        console.log("Wrote to ~/.distdownrc");
+        cb(err);
+      }
+    });
+  }
+ 
+  async.waterfall([
+    getData,
+    writeConfigFile
+  ], 
+  function(err, results){
+
+    console.log("Setup complete, please use distdown create to set up a project release directory");
+
+  });
+
+
+      
+   
+
+
+function ask(description, cb){
+  process.stdout.write(description);
+  process.stdin.setEncoding('utf8');
+  process.stdin.once('data', function(data){
+    data = data.toString().trim();
+    process.stdin.pause();
+    cb(data);
+  });
+  process.stdin.resume(); 
+}
