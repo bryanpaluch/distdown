@@ -1,0 +1,192 @@
+#!/usr/bin/env node
+var program = require('commander');
+var fs = require('fs');
+var async = require("async");
+var Connection = require("ssh2");
+var Table = require('cli-table');
+var rimraf = require("rimraf");
+var ProgressBar = require("progress");
+var DecompressZip = require('decompress-zip');
+
+program.parse(process.argv);
+
+try{
+  var configFile = fs.readFileSync(process.env.HOME + "/.distdownrc");
+  var config = JSON.parse(configFile);
+}catch(e){
+  console.log("problem parsing distdownrc");
+  process.exit();;
+}
+
+console.log(program.args);
+
+if(program.args.length < 2){
+  console.log("Not enough argruments please include Org and project name");
+  process.exit();
+}
+var install_path = '/opt/distdown';
+
+if(!fs.existsSync(install_path)) {
+  console.log(" Please run distdown setup distdown directory for downloads not created");
+  process.exit();
+}
+
+var path = "projects/" + program.args[0] + '/'  + program.args[1]
+
+
+// Go Connect and either look for readdir for the latest commit or just skip that and go download
+function connect (cb){
+  var c = new Connection();
+  c.on('ready', function(){
+    cb(null, c); 
+  });
+  var ipport = config.ipport.split(':');
+  var host = ipport[0];
+  var port = (ipport.length > 1) ? ipport[1] : 22;
+
+  console.log("Connecting to " + host + " " + port);
+ 
+  c.connect({
+    host: host,
+    port : port,
+    username: config.username,
+    privateKey: fs.readFileSync(config.keyPath)
+  });
+
+}
+
+function readDir(c, cb){
+  c.sftp(function(err, sftp){
+
+    if(err) return cb(err);
+    
+    var lastFile = {filename: null, mtime:0};
+    sftp.opendir(path, function(err, handle){
+      
+      if(err){
+        console.log("Unknown org or project", path, err);
+        process.exit();
+        throw err;
+      }
+
+      function  readdir (handle){
+        sftp.readdir(handle,  function(err, list){
+          if(err) return cb(err);
+
+          if (list === false) {
+            sftp.close(handle, function(err){
+              cb(err, lastFile.filename, sftp);
+            });
+            return;
+          }
+          list.forEach(function(item){
+            // ignore .files
+            if(item.filename.substring(0,1) === '.') return;
+            
+            if(lastFile.mtime < item.attrs.mtime){
+              lastFile = {filename: item.filename,mtime: item.attrs.mtime};
+            }
+
+          });
+          readdir(handle);
+        });
+      }
+
+            
+      if(program.args.length === 2){
+        readdir(handle);
+      }else if(program.args.length === 3){
+        cb(null, program.args[1] + "-" + program.args[2] + ".zip", sftp);
+
+      }
+
+    });
+  });
+}
+  
+
+function download(filename, sftp, cb){
+  console.log("downloading file", filename);
+  var localPath = "/opt/distdown/" + filename;
+  var bar = false;
+  var runFirst = function(total){
+    
+    if(bar) return;
+
+    bar = new ProgressBar(' downloading [:bar] :percent :etas', {
+      complete: '=',
+      incomplete: ' ',
+      width: 80,
+      total: total
+    });
+
+  }
+  sftp.fastGet(path + "/" + filename, "/opt/distdown/" + filename, 
+  {
+    step: function(total_transferred, chunk, total){
+      runFirst(total);
+      bar.tick(chunk);
+  
+    }
+  }, 
+  function(err){
+    console.log("Download complete, time to unpack");
+    cb(err, localPath);
+  }); 
+}
+
+function unzip(localPath, cb){
+  console.log("Time to unpack " + localPath);
+  
+  var unzipper = new DecompressZip(localPath);
+
+  unzipper.on('error', function(err){
+    cb("Already unpacked this version please make sure you wanted to do this");
+  });
+
+  unzipper.on('extract', function(log){
+    console.log("finished extraction", log);
+    cb(null, localPath);
+  });
+
+  unzipper.extract({
+    path: '/opt/distdown/' + program.args[0] + "/" + program.args[1]
+  });
+
+}
+
+function deletePacked(localPath, cb){
+  console.log("Time to delete " + localPath);
+  rimraf(localPath, cb);
+}
+
+function display(list){
+  var table = new Table({
+    head: [col1Name, 'Last Update'],
+    colWidth: [200, 100]
+  });
+
+  list.forEach(function(project){
+    table.push(project);
+  });
+  console.log(table.toString());
+  process.exit();
+
+}
+
+async.waterfall([
+  connect,
+  readDir,
+  download,
+  unzip,
+  deletePacked
+],
+function(err, result){
+  if(err){
+    console.log("error", err);
+    process.exit();
+    return;
+  }
+  console.log("complete");
+  process.exit();
+});
