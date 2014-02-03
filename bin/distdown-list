@@ -14,7 +14,6 @@ try{
   console.log("problem parsing distdownrc");
 }
 
-console.log(program.args);
 
 //The default folder on the sftp server is projects
 //Org lookup

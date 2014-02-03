@@ -1,6 +1,7 @@
 {
   "name": "distdown",
   "version": "0.0.1",
+  "bin": "./bin/distdown",
   "description": "Command line app for downloading applications from distdown sftp servers",
   "main": "index.js",
   "scripts": {

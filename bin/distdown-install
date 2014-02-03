@@ -4,6 +4,9 @@ var fs = require('fs');
 var async = require("async");
 var Connection = require("ssh2");
 var Table = require('cli-table');
+var rimraf = require("rimraf");
+var ProgressBar = require("progress");
+var DecompressZip = require('decompress-zip');
 
 program.parse(process.argv);
 
@@ -12,84 +15,52 @@ try{
   var config = JSON.parse(configFile);
 }catch(e){
   console.log("problem parsing distdownrc");
-  process.exit();;
+  process.exit();
 }
 
-console.log(program.args);
 
-if(program.args < 2){
+if(program.args.length < 2){
   console.log("Not enough argruments please include Org and project name");
   process.exit();
 }
-var install_path = '/opt/distdown';
 
-if(!fs.existsSync(install_path)) {
-  console.log(" Please run distdown setup distdown directory for downloads not created");
+var firstTimeInstall = false;
+
+// use graceful shutdown script before relinking
+var useGrace = false;
+
+// link and restart 
+var useLinkAndRestart = false;
+
+// Apps just run directly from opt with thier project name... yep
+var app_path = '/opt/' + program.args[1];
+
+var release_path = '/opt/distdown/' + program.args[0] + "/" + program.args[1] + "/" + program.args[2];
+
+if(!fs.existsSync(release_path)) {
+  console.log("Release does not exist please use distdown download first");
   process.exit();
 }
 
 
 
+if(!fs.existsSync(app_path)) {
+  console.log(" App is not already installed install for the first time");
+  firstTimeInstall = true;
+}
 
-var c = new Connection();
-c.on('ready', function(){
-  c.sftp(function(err, sftp){
-    if(err) throw err;
-    var projectList = [];
-    sftp.opendir(path, function  readdir (err, handle){
-      if(err){
-        console.log("Unknown org or project");
-        process.exit();
-        throw err;
-
-      }
-      sftp.readdir(handle,  function(err, list){
-        if(err) throw err;
-        if (list === false) {
-          sftp.close(handle, function(err){
-            if(err) throw err;
-            sftp.end();
-            display(projectList);
-          });
-          return;
-        }
-        list.forEach(function(item){
-          // ignore .files
-          if(item.filename.substring(0,1) === '.') return;
-          
-          projectList.push([item.filename, new Date(item.attrs.mtime*1000).toLocaleString()]);
-
-        });
-        readdir(undefined, handle);
-      });
-    });
+function link(app_path, release_path,cb){
+  console.log("linking", app_path, release_path);
+  fs.symlink(release_path, app_path, function(err){
+    cb(err);
   });
-
-});
-
-var ipport = config.ipport.split(':');
-var host = ipport[0];
-var port = (ipport.length > 1) ? ipport[1] : 22;
-
-console.log("Connecting to " + host + " " + port);
-c.connect({
-  host: host,
-  port : port,
-  username: config.username,
-  privateKey: fs.readFileSync(config.keyPath)
-});
-
-
-function display(list){
-  var table = new Table({
-    head: [col1Name, 'Last Update'],
-    colWidth: [200, 100]
-  });
-
-  list.forEach(function(project){
-    table.push(project);
-  });
-  console.log(table.toString());
-  process.exit();
 
 }
+
+async.waterfall([
+  link.bind(this, app_path, release_path)
+],
+function(err, results){
+  console.log("Linking complete");
+});
+

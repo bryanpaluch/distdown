@@ -18,7 +18,6 @@ try{
   process.exit();;
 }
 
-console.log(program.args);
 
 if(program.args.length < 2){
   console.log("Not enough argruments please include Org and project name");
@@ -145,7 +144,7 @@ function unzip(localPath, cb){
   });
 
   unzipper.on('extract', function(log){
-    console.log("finished extraction", log);
+    console.log("finished extraction");
     cb(null, localPath);
   });
 

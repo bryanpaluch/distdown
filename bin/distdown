@@ -7,6 +7,7 @@ program
   .command('list <org> <project_name>', "List projects or releases under an project ")
   .command('download <org> <project_name> <shortsha>', "download a version of your application that corresponds to the git shortsha")
   .command('setup', "Configures machine for use with a distdown sftp server")
+  .command('install', "Installs a previously downloaded release and links it to the main release file")
   .parse(process.argv);
 
 if(!program.args.length) program.help();
