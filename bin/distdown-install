@@ -2,108 +2,94 @@
 var program = require('commander');
 var fs = require('fs');
 var async = require("async");
+var Connection = require("ssh2");
+var Table = require('cli-table');
 
-program
-  .command('download <org> <project_name> <shortsha>')
-  .description('download a version of your application that corresponds to the git shortsha') .option("-i, --install", "Will also run the special dist_install.js script after download")
-  .action(downloadShort);
+program.parse(process.argv);
 
-program
-  .command('setup')
-  .description('Configures machine for use with a distdown sftp server')
-  .option("-o, --overwrite", "Over write ~/.distdownrc")
-  .action(setup);      
+try{
+  var configFile = fs.readFileSync(process.env.HOME + "/.distdownrc");
+  var config = JSON.parse(configFile);
+}catch(e){
+  console.log("problem parsing distdownrc");
+  process.exit();;
+}
+
+console.log(program.args);
+
+if(program.args < 2){
+  console.log("Not enough argruments please include Org and project name");
+  process.exit();
+}
+var install_path = '/opt/distdown';
+
+if(!fs.existsSync(install_path)) {
+  console.log(" Please run distdown setup distdown directory for downloads not created");
+  process.exit();
+}
 
 
 
-  program.parse(process.argv);
 
-  if(!program.args.length) program.help();
+var c = new Connection();
+c.on('ready', function(){
+  c.sftp(function(err, sftp){
+    if(err) throw err;
+    var projectList = [];
+    sftp.opendir(path, function  readdir (err, handle){
+      if(err){
+        console.log("Unknown org or project");
+        process.exit();
+        throw err;
 
-  function downloadShort(shortsha, options){
-    console.log("Downloading shortsha from sftp server ", shortsha);
-
-  }
-
-  function setup(env, options){
-    console.log(this); 
-    var settings = options.overwrite && fs.existsSync('./.distdownrc');
-
-    if(settings){
-      console.log("Using local distdown config already");
-      return;
-    }
-
-    settings = options.overwrite && fs.existsSync(process.env.HOME + '/.distdownrc');
-   
-    if(settings){
-      console.log("Using ~/.distdownrc config already");
-      return;
-    }
-
-    var config;
-
-    function getData (cb){
-      async.series({
-        ipport: function(cb){
-          process.stdout.write("Enter distdown server ip (sftp ip:port): ");
-          ask(function(ipport){
-            cb(null, ipport);
+      }
+      sftp.readdir(handle,  function(err, list){
+        if(err) throw err;
+        if (list === false) {
+          sftp.close(handle, function(err){
+            if(err) throw err;
+            sftp.end();
+            display(projectList);
           });
-        },
-        keyPath: function(cb){
-          process.stdout.write("Enter distdown key ['~/.ssh/id_rsa']: ");
-          ask(function(keyPath){
-            if(keyPath === '') keyPath = process.env.HOME + '/.ssh/id_rsa';
-            cb(null, keyPath);
-          });
+          return;
         }
-      },
-      function(err, results){
-        console.log("Using server: " + results.ipport + " key: " + results.keyPath);
-        config = results;
-        cb(err, results);
+        list.forEach(function(item){
+          // ignore .files
+          if(item.filename.substring(0,1) === '.') return;
+          
+          projectList.push([item.filename, new Date(item.attrs.mtime*1000).toLocaleString()]);
+
+        });
+        readdir(undefined, handle);
       });
-    }
-
-    function writeConfigFile(config, cb){
-      var path = process.env.HOME + '/.distdownrc'; 
-      console.log("creating config file ~/.distdownrc");
-      console.log(process.env);
-      fs.writeFile(path,JSON.stringify(config, null, 4), function(err){
-        if(err){
-          console.log(err);
-          cb(err);
-        }else {
-          console.log("Wrote to ~/.distdownrc");
-          cb(err);
-        }
-      });
-    }
-   
-    async.waterfall([
-      getData,
-      writeConfigFile
-    ], 
-    function(err, results){
-
-      console.log("Setup complete, please use distdown create to set up a project release directory");
-
     });
-
-
-        
-     
-  }
-
-
-function ask(cb){
-
-  process.stdin.setEncoding('utf8');
-  process.stdin.once('data', function(data){
-    data = data.toString().trim();
-    process.stdin.pause();
-    cb(data);
   });
-  process.stdin.resume(); 
+
+});
+
+var ipport = config.ipport.split(':');
+var host = ipport[0];
+var port = (ipport.length > 1) ? ipport[1] : 22;
+
+console.log("Connecting to " + host + " " + port);
+c.connect({
+  host: host,
+  port : port,
+  username: config.username,
+  privateKey: fs.readFileSync(config.keyPath)
+});
+
+
+function display(list){
+  var table = new Table({
+    head: [col1Name, 'Last Update'],
+    colWidth: [200, 100]
+  });
+
+  list.forEach(function(project){
+    table.push(project);
+  });
+  console.log(table.toString());
+  process.exit();
+
 }

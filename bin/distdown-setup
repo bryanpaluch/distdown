@@ -18,6 +18,9 @@ program
  
   if(settings){
     console.log("Using ~/.distdownrc config already");
+    createDownloadDirectory(function(err){
+      process.exit();
+    });
     return;
   }
 
@@ -61,10 +64,26 @@ program
       }
     });
   }
+  
+  function createDownloadDirectory(cb){
+    var download_dir = '/opt/distdown';
+    var exists = fs.existsSync(download_dir);
+    if(!exists){
+      console.log("creating download directory " + download_dir);
+      fs.mkdir(download_dir, function(err){
+        cb(err)
+      });
+    }else{
+      console.log("Download directory exists");
+      cb();
+    }
+
+  }
  
   async.waterfall([
     getData,
-    writeConfigFile
+    writeConfigFile,
+    createDownloadDirectory
   ], 
   function(err, results){
 
