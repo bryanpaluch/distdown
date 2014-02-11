@@ -1,12 +1,13 @@
 {
   "name": "distdown",
   "version": "0.0.2",
-  "bin": { "distdown" : "./bin/distdown",
-           "distdown-install" : "./bin/distdown-install",
-           "distdown-setup" : "./bin/distdown-setup",
-           "distdown-download" : "./bin/distdown-download",
-           "distdown-list" : "./bin/distdown-list"
-         },
+  "bin": {
+    "distdown": "./bin/distdown",
+    "distdown-install": "./bin/distdown-install",
+    "distdown-setup": "./bin/distdown-setup",
+    "distdown-download": "./bin/distdown-download",
+    "distdown-list": "./bin/distdown-list"
+  },
   "description": "Command line app for downloading applications from distdown sftp servers",
   "main": "index.js",
   "scripts": {
@@ -21,6 +22,7 @@
     "cli-table": "~0.2.0",
     "rimraf": "~2.2.6",
     "progress": "~1.1.3",
-    "decompress-zip": "0.0.4"
+    "decompress-zip": "0.0.4",
+    "git-wrapper2": "~0.2.5"
   }
 }
